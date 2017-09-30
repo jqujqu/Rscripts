@@ -14,7 +14,7 @@ Rscript sraInfo.R -h
 ```
 Example usage
 ```
-Rscript sraInfo.R -d /Users/jenny/SRAmetadb.sqlite  -o ${PWD}/new_study -l ChIP-Seq SRP057141 
+Rscript sraInfo.R -d /Users/jenny/SRAmetadb.sqlite -m /Users/jenny/GEOmetadb.sqlite  -o ${PWD}/new_study -l ChIP-Seq SRP057141 
 ```
 ### Output:
 An `<Accession>.csv` file containing the following columns: 
@@ -34,3 +34,4 @@ library_name	| human1_PS_K4
 library_strategy|ChIP-Seq	
 library_layout	|SINGLE - 
 sample_attribute| isolate: BL2 \|\| age: missing \|\| biomaterial_provider: Dr. Sherman Silber, Infertility Center of St. Louis, St. Luke's Hospital, St. Louis, MO, USA \|\| sex: male \|\| tissue: testis \|\| cell_type: pachytene spermatocyte \|\| phenotype: fertile \|\| BioSampleModel: Human
+title | NA

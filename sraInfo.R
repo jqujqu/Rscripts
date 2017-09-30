@@ -6,7 +6,13 @@ opt.list = list(
                 default = "./SRAmetadb.sqlite",
                 help    = paste("Path to SRA database file, if does not exist",
                                 "database will be download to this location.",
-                                "Default is 'SRAmetadb.sqlite'.")),
+                                "Default is './SRAmetadb.sqlite'.")),
+    make_option(c("-m", "--geometadb"),
+                type    = "character",
+                default = "./GEOmetadb.sqlite",
+                help    = paste("Path to GEOmetadb database file, if does not exist",
+                                "database will be download to this location.",
+                                "Default is './GEOmetadb.sqlite'.")),
     make_option(c("-o", "--outdir"),
                 type    = "character",
                 default = getwd(),
@@ -49,15 +55,34 @@ if (!file.exists(opt$database)) {
 sra_con <- dbConnect(SQLite(), sql.file)
 
 
-# Create output directory if it doesn't exist
+suppressPackageStartupMessages(library("GEOmetadb"))
+if(!file.exists(opt$geometadb)) getSQLiteFile()
+### Check if GEO databases exists and download if needed
+message("Checking if GEOmetadb database exists...")
+if (!file.exists(opt$geometadb)) {
+    message("Database file not found.")
+    db.path  <- system(paste("dirname", opt$geometadb), intern = TRUE)
+    db.file  <- system(paste("basename", opt$geometadb), intern = TRUE)
+    if (!dir.exists(db.path)) {
+        dir.create(db.path)
+    }
+    message(paste("Downloading database to", file.path(db.path, db.file)))
+    sql.file <- getSQLiteFile(destdir  = db.path,
+                              destfile = paste0(db.file, ".gz"))
+} else {
+    message(paste("Database file found at", opt$geometadb))
+    sql.file <- opt$geometadb
+}
+geo_con <- dbConnect(SQLite(), opt$geometadb)
+
+### Create output directory if it doesn't exist
 message("Checking if output directory exists...")
 if (!dir.exists(opt$outdir)) {
     message(paste("Creating output directory at", opt$outdir))
     dir.create(opt$outdir)
 }
 
-
-myGetAddress <- function(accession, sra_con, 
+myGetAddress <- function(accession, sra_con,
                          fileType = 'sra', srcType='ftp') {
   return(listSRAfile(in_acc=accession, sra_con = sra_con,
          fileType = fileType, srcType=srcType)[,5])
@@ -69,17 +94,20 @@ myGetSampleAlias <- function(srs, sra_con) {
 }
 
 myGetExperimentAlias <- function(srx, sra_con) {
-  return (unlist(dbGetQuery(sra_con, paste("SELECT experiment_alias ", 
+  return (unlist(dbGetQuery(sra_con, paste("SELECT experiment_alias ",
     "FROM experiment WHERE experiment_accession='", srx, "'", sep="") ) ) )
 }
+
+myGetGSMTilte <- function(gsm, geo_con){
+  return (unlist(dbGetQuery(geo_con,
+    paste("SELECT title FROM gsm WHERE gsm='", gsm, "'", sep="") ) ) )
+}
+
+isGSM <- function(s) { return(substr(s, 1,3)=="GSM")}
 
 for (accession in accessions) {
   conversion <- sraConvert(in_acc= accession, sra_con = sra_con,
       out_type = c("sra", "submission", "study", "sample", "experiment", "run") )
-
-  info <- as.data.frame(matrix(NA, nrow(conversion), 4))
-  names(info) <- c("library_name", "library_strategy", "library_layout",
-      "sample_attribute")
 
   conversion$ftp <- apply(matrix(conversion$run, ncol=1), MAR=1,
       FUN = myGetAddress, sra_con = sra_con, fileType = 'sra', srcType='ftp')
@@ -90,11 +118,18 @@ for (accession in accessions) {
   conversion <- cbind(conversion, t(apply(matrix(conversion$sample, ncol=1),
       MAR=1, FUN=myGetSampleAlias, sra_con=sra_con)))
 
+  info <- as.data.frame(matrix(NA, nrow(conversion), 5))
+  names(info) <- c("library_name", "library_strategy", "library_layout",
+      "sample_attribute", "title")
+
   for (i in 1:nrow(conversion)) {
     run_accession <- conversion$run[i]
-    info[i, ] <- dbGetQuery(sra_con, paste("SELECT library_name, library_strategy,
+    info[i, 1:4] <- dbGetQuery(sra_con, paste("SELECT library_name, library_strategy,
       library_layout, sample_attribute FROM sra WHERE run_accession='",
       run_accession, "'", sep=""))
+    if (isGSM(conversion$sample_alias[i])) {
+      info[i, 5] <- myGetGSMTilte(conversion$sample_alias[i], geo_con)
+    }
   }
 
   conversion <- cbind(conversion, info)
