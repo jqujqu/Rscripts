@@ -10,7 +10,7 @@ opt.list = list(
                 type    = "character",
                 default = "sample",
                 help    = paste("column name of the field in the SRAINFO table to rename,",
-                                "Default is 'sample'.")),            
+                                "Default is 'sample'.")),
     make_option(c("-o", "--outdir"),
                 type    = "character",
                 default = getwd(),
@@ -45,4 +45,6 @@ for (i in unique(x$rename)){
   }
   message(paste("Writing related run information to ", paste(path, "runinfo.csv", sep="/")))
   write.csv(x[x$rename == i, ], file=paste(path, "runinfo.csv", sep="/"))
+  write.table(x$ftp[x$rename == i], quote=F, row.names=F, col.names=F,
+              file=paste(path, "sralinks.txt", sep="/"))
 }
